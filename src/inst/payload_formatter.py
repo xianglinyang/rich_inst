@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from src.llm_zoo import load_model
+from src.llm_zoo.base_model import BaseLLM
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +195,55 @@ def format_payload(
             last_err = e
             logger.warning(
                 f"format_payload attempt {attempt + 1}/{max_retries + 1} failed: {e!r}"
+            )
+
+    return StylizedPayload(
+        original_text=payload,
+        stylized_text=payload,
+        style=style,
+        rewriter_model=model,
+        qc_passed=False,
+        qc_notes=[f"call_failed: {last_err!r}"],
+    )
+
+
+async def aformat_payload(
+    payload: str,
+    style: str,
+    model: str,
+    *,
+    llm: Optional[BaseLLM] = None,
+    max_retries: int = 2,
+) -> StylizedPayload:
+    """
+    Async equivalent of `format_payload`. Caller may pass a shared `llm`
+    instance so many payloads can run concurrently on one async client.
+    """
+    prompt = _build_prompt(payload, style)
+    llm = llm or load_model(model, mode="api")
+
+    last_err: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            results = await llm.batch_invoke([prompt])
+            if not results or results[0] is None:
+                raise RuntimeError(f"batch invoke failed [{llm.model_name}]")
+            raw = results[0]
+            stylized = _clean(raw)
+            notes: List[str] = []
+            _run_qc(payload, stylized, notes)
+            return StylizedPayload(
+                original_text=payload,
+                stylized_text=stylized if stylized else payload,
+                style=style,
+                rewriter_model=model,
+                qc_passed=(len(notes) == 0),
+                qc_notes=notes,
+            )
+        except Exception as e:
+            last_err = e
+            logger.warning(
+                f"aformat_payload attempt {attempt + 1}/{max_retries + 1} failed: {e!r}"
             )
 
     return StylizedPayload(

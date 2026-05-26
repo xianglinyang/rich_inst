@@ -14,6 +14,7 @@ import sys
 import tempfile
 import textwrap
 import uuid
+from contextlib import contextmanager
 from typing import List
 
 from fastapi import FastAPI, HTTPException
@@ -47,21 +48,26 @@ _BENIGN_ASSERTION = textwrap.dedent("""\
 # Text → inspectable Python object
 # ---------------------------------------------------------------------------
 
-def _load_text_as_function(text: str):
-    """Embed text in a temp .py file docstring so inspect.getsource() works."""
+@contextmanager
+def _text_as_function(text: str):
+    """Embed text in a temp .py file docstring so inspect.getsource() works.
+
+    File and module are kept alive for the duration of the with-block so that
+    IntentGuard's internal inspect.getsource() call succeeds.
+    """
     escaped = text.replace('\\', '\\\\').replace('"""', "'''")
     src = f'def text_content():\n    """{escaped}"""\n    pass\n'
 
     mod_name = f"_intentguard_tmp_{uuid.uuid4().hex}"
     tmp_path = os.path.join(tempfile.gettempdir(), f"{mod_name}.py")
+    with open(tmp_path, "w", encoding="utf-8") as fh:
+        fh.write(src)
+    spec = importlib.util.spec_from_file_location(mod_name, tmp_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = module
+    spec.loader.exec_module(module)
     try:
-        with open(tmp_path, "w", encoding="utf-8") as fh:
-            fh.write(src)
-        spec = importlib.util.spec_from_file_location(mod_name, tmp_path)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[mod_name] = module
-        spec.loader.exec_module(module)
-        return module.text_content
+        yield module.text_content
     finally:
         try:
             os.remove(tmp_path)
@@ -111,12 +117,12 @@ def detect(req: DetectRequest):
 
     results: List[DetectItem] = []
     for text in req.texts:
-        func = _load_text_as_function(text)
-        evaluation = ig.test_code(
-            _BENIGN_ASSERTION,
-            {"text_content": func},
-            options=_options,
-        )
+        with _text_as_function(text) as func:
+            evaluation = ig.test_code(
+                _BENIGN_ASSERTION,
+                {"text_content": func},
+                options=_options,
+            )
         blocked = not evaluation.result
         results.append(DetectItem(
             label="prompt_injection" if blocked else "benign",

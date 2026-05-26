@@ -20,6 +20,7 @@ from typing import Dict, List, Optional
 
 from src.llm_zoo import load_model
 from src.llm_zoo.base_model import BaseLLM
+from src.inst.qc import find_refusal_artifact
 
 logger = logging.getLogger(__name__)
 
@@ -81,16 +82,6 @@ Original instruction:
 Rephrased (narrative prose):"""
 
 
-# Heuristic refusal markers — used to flag responses that look like the model
-# declined rather than rephrased.
-_REFUSAL_MARKERS = (
-    "i can't", "i cannot", "i won't", "i will not",
-    "i'm sorry", "i am sorry", "i apologize",
-    "as an ai", "i'm not able", "i am not able",
-    "unable to comply", "cannot assist",
-)
-
-
 @dataclass
 class StylizedPayload:
     """Output of one format_payload call. Carries provenance for JSONL rows."""
@@ -139,11 +130,9 @@ def _run_qc(original: str, stylized: str, notes: List[str]) -> None:
     if not stylized:
         notes.append("empty: model returned no text")
         return
-    low = stylized.lower()
-    for marker in _REFUSAL_MARKERS:
-        if marker in low:
-            notes.append(f"refusal: contains marker {marker!r}")
-            break
+    refusal_note = find_refusal_artifact(stylized)
+    if refusal_note:
+        notes.append(refusal_note)
     if stylized.strip() == original.strip():
         notes.append("no_rewrite: stylized text identical to original")
 

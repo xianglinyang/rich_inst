@@ -20,11 +20,12 @@ from src.inst.composer import substitute_payloads
 from src.inst.payload_formatter import (
     STYLE_DESCRIPTIONS,
     StylizedPayload,
+    aformat_payload,
     format_payload,
 )
 from src.inst.qc import run_qc
 from src.inst.schema import ModifiedContext, RewriteResult, Span, SelfCheck
-from src.inst.style_rewriter import rewrite
+from src.inst.style_rewriter import arewrite, rewrite
 
 __all__ = [
     "transform",
@@ -32,12 +33,14 @@ __all__ = [
     "run_qc",
     "substitute_payloads",
     "format_payload",
+    "aformat_payload",
     "STYLE_DESCRIPTIONS",
     "ModifiedContext",
     "RewriteResult",
     "StylizedPayload",
     "Span",
     "SelfCheck",
+    "atransform",
 ]
 
 
@@ -82,6 +85,53 @@ def transform(
         context,
         style=style,
         model=model,
+        position=rewrite_position,
+        injection_frequency=injection_frequency,
+        benign_frequency=benign_frequency,
+        max_retries=max_retries,
+    )
+    result = run_qc(result, context)
+
+    modified_text, spans = substitute_payloads(result.rewritten_text, payloads)
+
+    return ModifiedContext(
+        original_text=context,
+        modified_text=modified_text,
+        style=style,
+        position=position if injection_frequency > 0 else "none",
+        injection_frequency=injection_frequency,
+        benign_frequency=benign_frequency,
+        injected_spans=spans,
+        binary_label=1 if spans else 0,
+        rewriter_model=model,
+        qc_passed=result.qc_passed,
+        qc_notes=result.qc_notes,
+        rewritten_text=result.rewritten_text,
+        region_offsets=result.region_offsets,
+    )
+
+
+async def atransform(
+    context: str,
+    payloads: Optional[List[str]],
+    *,
+    style: str,
+    model: str,
+    llm=None,
+    position: str = "middle_inst",
+    benign_frequency: int = 5,
+    max_retries: int = 2,
+) -> ModifiedContext:
+    """Async equivalent of `transform`."""
+    payloads = payloads or []
+    injection_frequency = len(payloads)
+    rewrite_position = position if injection_frequency > 0 else "begin_context"
+
+    result = await arewrite(
+        context,
+        style=style,
+        model=model,
+        llm=llm,
         position=rewrite_position,
         injection_frequency=injection_frequency,
         benign_frequency=benign_frequency,

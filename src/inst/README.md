@@ -119,14 +119,16 @@ in `ModifiedContext.region_offsets` for QC and downstream analysis.
 
 ## QC system
 
-`run_qc` applies six deterministic checks after every rewrite:
+`run_qc` applies eight deterministic checks after every rewrite:
 
 1. **Placeholder count** — number of `[[INJECTION_SPAN]]` tokens equals `injection_frequency`
-2. **Region membership** — placeholder landed in the expected region / sub-band
-3. **Length ratio** — rewritten text is between 0.4× and (3.0 + 0.3×benign_frequency)× the original length
-4. **Self-check flags** — model's own self-assessment (`facts_preserved`, `placeholder_count_correct`, `no_new_unsafe_instruction_added`) are all True
-5. **Benign cue density** — cue-word count is within [0.4×, 3.0×] of `benign_frequency` (inst styles only)
-6. **All three regions present** — `context_pre`, `inst`, `context_post` all found in `region_offsets` (inst styles with injection)
+2. **Placeholder boundary** — placeholder is not attached to neighboring prose in a way that creates run-on text after substitution
+3. **Region membership** — placeholder landed in the expected region / sub-band
+4. **Length ratio** — rewritten text is between 0.4× and (3.0 + 0.3×benign_frequency)× the original length
+5. **Self-check flags** — model's own self-assessment (`facts_preserved`, `placeholder_count_correct`, `no_new_unsafe_instruction_added`) are all True
+6. **Benign cue density** — cue-word count is within [0.4×, 3.0×] of `benign_frequency` (inst styles only)
+7. **All three regions present** — `context_pre`, `inst`, `context_post` all found in `region_offsets` (inst styles with injection)
+8. **Refusal artifacts absent** — refusal or safe-alternative text is flagged so rows with model refusals can be filtered or retried
 
 `qc_passed=False` does **not** raise an exception; it annotates the row so the
 caller can filter or retry.

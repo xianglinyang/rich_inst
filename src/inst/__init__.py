@@ -23,7 +23,7 @@ from src.inst.payload_formatter import (
     aformat_payload,
     format_payload,
 )
-from src.inst.qc import run_qc
+from src.inst.qc import find_refusal_artifact, run_qc
 from src.inst.schema import ModifiedContext, RewriteResult, Span, SelfCheck
 from src.inst.style_rewriter import arewrite, rewrite
 
@@ -93,6 +93,11 @@ def transform(
     result = run_qc(result, context)
 
     modified_text, spans = substitute_payloads(result.rewritten_text, payloads)
+    qc_notes = list(result.qc_notes)
+    refusal_note = find_refusal_artifact(modified_text)
+    if refusal_note and refusal_note not in qc_notes:
+        qc_notes.append(refusal_note)
+    qc_passed = result.qc_passed and refusal_note is None
 
     return ModifiedContext(
         original_text=context,
@@ -104,8 +109,8 @@ def transform(
         injected_spans=spans,
         binary_label=1 if spans else 0,
         rewriter_model=model,
-        qc_passed=result.qc_passed,
-        qc_notes=result.qc_notes,
+        qc_passed=qc_passed,
+        qc_notes=qc_notes,
         rewritten_text=result.rewritten_text,
         region_offsets=result.region_offsets,
     )
@@ -140,6 +145,11 @@ async def atransform(
     result = run_qc(result, context)
 
     modified_text, spans = substitute_payloads(result.rewritten_text, payloads)
+    qc_notes = list(result.qc_notes)
+    refusal_note = find_refusal_artifact(modified_text)
+    if refusal_note and refusal_note not in qc_notes:
+        qc_notes.append(refusal_note)
+    qc_passed = result.qc_passed and refusal_note is None
 
     return ModifiedContext(
         original_text=context,
@@ -151,8 +161,8 @@ async def atransform(
         injected_spans=spans,
         binary_label=1 if spans else 0,
         rewriter_model=model,
-        qc_passed=result.qc_passed,
-        qc_notes=result.qc_notes,
+        qc_passed=qc_passed,
+        qc_notes=qc_notes,
         rewritten_text=result.rewritten_text,
         region_offsets=result.region_offsets,
     )

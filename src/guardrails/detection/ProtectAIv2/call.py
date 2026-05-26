@@ -25,7 +25,7 @@ def project_label_to_guard_decision(res: Dict[str, Any], threshold: float = 0.5)
     return decision
 
 class ProtectAIv2Client:
-    def __init__(self, base_url: str, timeout: float = 10.0, threshold: float = 0.8):
+    def __init__(self, base_url: str, timeout: float = 10.0, threshold: float = 0.5):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.threshold = threshold

@@ -142,7 +142,7 @@ class PISanitizerClient:
         return SanitizerDecision(
             is_injection=is_inj,
             category="prompt_injection" if is_inj else "benign",
-            confidence=1.0 if is_inj else 0.0,
+            confidence=1.0,
             detected_spans=spans,
             sanitized_text=sanitized,
             reason=(

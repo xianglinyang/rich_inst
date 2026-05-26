@@ -2,7 +2,7 @@ import requests
 from typing import List, Dict, Any
 from src.guardrails.safety_guard import GuardDecision
 
-def project_label_to_guard_decision(res: Dict[str, Any], threshold: float = 0.8) -> GuardDecision:
+def project_label_to_guard_decision(res: Dict[str, Any], threshold: float = 0.5) -> GuardDecision:
     label = res["label"]
     conf = res["confidence"]
 

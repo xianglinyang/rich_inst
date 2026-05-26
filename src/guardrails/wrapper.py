@@ -61,16 +61,16 @@ from src.guardrails.safety_guard import GuardDecision, JudgeDecision, SanitizerD
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _build_classifier(name: str):
+def _build_classifier(name: str, threshold: float = 0.5):
     port = _GUARD_PORTS[name]
     if name == "PIGuard":
-        return PIGuardClient(f"http://localhost:{port}")
+        return PIGuardClient(f"http://localhost:{port}", threshold=threshold)
     if name in ("PromptGuard_22M", "PromptGuard_86M"):
-        return PromptGuardClient(f"http://localhost:{port}")
+        return PromptGuardClient(f"http://localhost:{port}", threshold=threshold)
     if name == "ProtectAIv2":
-        return ProtectAIv2Client(f"http://localhost:{port}")
+        return ProtectAIv2Client(f"http://localhost:{port}", threshold=threshold)
     if name == "IntentGuard":
-        return IntentGuardClient(f"http://localhost:{port}")
+        return IntentGuardClient(f"http://localhost:{port}", threshold=threshold)
     raise ValueError(f"Unknown classifier: {name!r}")
 
 
@@ -89,7 +89,7 @@ def _chunk_text(text: str, chunk_chars: int, stride_chars: int) -> List[str]:
 
 
 def _malicious_score(d: GuardDecision) -> float:
-    """Normalize to a consistent p(malicious) regardless of the predicted label."""
+    """Normalize predicted-label confidence into p(malicious)."""
     return d.confidence if d.blocked else 1.0 - d.confidence
 
 
@@ -116,12 +116,13 @@ def _aggregate(
     else:
         raise ValueError(f"Unknown scan_mode: {mode!r}")
 
-    blocked = agg >= threshold
+    blocked = agg >= 0.5
+    confidence = agg if blocked else 1.0 - agg
     return GuardDecision(
         blocked=blocked,
-        valid=True,
+        valid=confidence >= threshold,
         category="prompt_injection" if blocked else "benign",
-        confidence=agg,
+        confidence=confidence,
         reason=reason,
     )
 
@@ -135,7 +136,7 @@ def _run_classifier(
     top_k: int,
     threshold: float,
 ) -> GuardDecision:
-    guard = _build_classifier(model_name)
+    guard = _build_classifier(model_name, threshold=threshold)
     if scan_mode == "whole_doc":
         return guard.detect([text])[0]
     chunks = _chunk_text(text, chunk_chars=chunk_chars, stride_chars=stride_chars)
@@ -176,7 +177,7 @@ def detect(
     chunk_chars : chunk size in characters (≈512 tokens at 3.5 c/t)
     stride_chars: step between consecutive chunk starts
     top_k       : chunks used by chunk_top_k
-    threshold   : malicious-score cutoff for chunk-aggregation modes
+    threshold   : confidence cutoff for marking the pass/block decision valid
 
     Judge-only
     ----------
@@ -188,7 +189,11 @@ def detect(
             text, model_name, scan_mode, chunk_chars, stride_chars, top_k, threshold
         )
     return judge_attack(
-        text, user_goal=user_goal, model_name=model_name, mode=judge_mode
+        text,
+        user_goal=user_goal,
+        model_name=model_name,
+        mode=judge_mode,
+        threshold=threshold,
     ).to_guard_decision()
 
 
@@ -197,6 +202,7 @@ def judge_attack(
     user_goal: str = "",
     model_name: str = "openai/gpt-4o-mini",
     mode: JudgeMode = "authority_aware",
+    threshold: float = 0.5,
 ) -> JudgeDecision:
     """
     Run the LLM-as-a-judge detector, returning the richer JudgeDecision.
@@ -209,8 +215,9 @@ def judge_attack(
     user_goal        : what the user explicitly asked for (used by authority_aware)
     model_name       : OpenRouter model id, e.g. "openai/gpt-4o-mini"
     mode             : content_only | authority_aware
+    threshold        : confidence cutoff for marking the decision valid
     """
-    client = LLMJudgeClient(model_name=model_name, mode=mode)
+    client = LLMJudgeClient(model_name=model_name, mode=mode, threshold=threshold)
     return client.judge(external_content, user_goal=user_goal)
 
 

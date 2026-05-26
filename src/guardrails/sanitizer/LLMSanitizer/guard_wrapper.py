@@ -104,13 +104,13 @@ def _parse_response(raw: str, original: str) -> SanitizerDecision:
         return SanitizerDecision(
             is_injection=False,
             category="benign",
-            confidence=0.0,
+            confidence=1.0,
             detected_spans=[],
             sanitized_text=original,
             reason="JSON parse failed — assuming benign",
         )
     is_inj      = bool(data.get("is_injection", False))
-    confidence  = float(data.get("confidence", 1.0 if is_inj else 0.0))
+    confidence  = float(data.get("confidence", 1.0))
     span_dicts  = data.get("detected_spans", []) or []
     spans       = _locate_spans(original, span_dicts) if is_inj else []
     sanitized   = str(data.get("sanitized_text", original))

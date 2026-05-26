@@ -126,7 +126,7 @@ def detect(req: DetectRequest):
         blocked = not evaluation.result
         results.append(DetectItem(
             label="prompt_injection" if blocked else "benign",
-            confidence=1.0 if blocked else 0.0,
+            confidence=1.0,
         ))
 
     return DetectResponse(

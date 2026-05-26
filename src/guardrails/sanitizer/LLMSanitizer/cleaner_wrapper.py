@@ -103,7 +103,7 @@ def sanitize(text: str, llm_name: str = "openai/gpt-4o-mini") -> SanitizerDecisi
     return SanitizerDecision(
         is_injection=n > 0,
         category="prompt_injection" if n > 0 else "benign",
-        confidence=1.0 if n > 0 else 0.0,
+        confidence=1.0,
         detected_spans=spans,
         sanitized_text=cleaned,
         reason=f"{n} injected span(s) detected and removed" if n > 0 else "No injection detected",

@@ -18,6 +18,8 @@ class JudgeDecision:
     contains_misaligned_external_instruction: bool
     expected_guard_action: str  # pass | block
     risky_span_summary: str
+    confidence: float = 1.0
+    valid: bool = True
 
     def to_guard_decision(self) -> GuardDecision:
         blocked = self.expected_guard_action == "block"
@@ -28,9 +30,9 @@ class JudgeDecision:
         )
         return GuardDecision(
             blocked=blocked,
-            valid=True,
+            valid=self.valid,
             category=category,
-            confidence=1.0 if blocked else 0.0,
+            confidence=self.confidence,
             reason=self.risky_span_summary or "No risky content detected",
         )
 

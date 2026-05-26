@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Dict, Literal, Tuple
+from typing import Dict, Literal, Optional, Tuple
 
 from src.inst.prompt_templates import (
     PROMPTS,
@@ -12,6 +12,7 @@ from src.inst.prompt_templates import (
 )
 from src.inst.schema import RewriteResult, SelfCheck
 from src.llm_zoo import load_model
+from src.llm_zoo.base_model import BaseLLM
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +211,85 @@ def rewrite(
             logger.warning(f"rewrite attempt {attempt + 1}/{max_retries + 1} failed: {e}")
 
     # Return a failed result so the pipeline can log and skip rather than crash
+    return RewriteResult(
+        rewritten_text="",
+        style=style,
+        position=position,
+        injection_frequency=injection_frequency,
+        benign_frequency=benign_frequency,
+        self_check=SelfCheck(
+            facts_preserved=False,
+            placeholder_count_correct=False,
+            no_new_unsafe_instruction_added=True,
+            raw={},
+        ),
+        rewriter_model=model,
+        region_offsets={},
+        qc_passed=False,
+        qc_notes=[f"parse_failed: {last_err}"],
+    )
+
+
+async def arewrite(
+    context: str,
+    style: str,
+    model: str,
+    *,
+    llm: Optional[BaseLLM] = None,
+    position: Position = "middle_inst",
+    injection_frequency: int = 1,
+    benign_frequency: int = 5,
+    max_retries: int = 2,
+) -> RewriteResult:
+    """
+    Async equivalent of `rewrite`. API calls can run concurrently when callers
+    schedule multiple `arewrite` calls with a shared async model client.
+    """
+    if style not in PROMPTS:
+        raise ValueError(f"Unknown style {style!r}")
+    if injection_frequency not in (0, 1, 2, 3):
+        raise ValueError(f"injection_frequency must be 0-3, got {injection_frequency}")
+    if benign_frequency < 0:
+        raise ValueError(f"benign_frequency must be >= 0, got {benign_frequency}")
+    if injection_frequency > 0 and position not in valid_positions_for(style):
+        raise ValueError(
+            f"Position {position!r} is not valid for style {style!r}. "
+            f"Valid: {valid_positions_for(style)}"
+        )
+
+    llm = llm or load_model(model, mode="api")
+    prompt = build_prompt(
+        style, context,
+        injection_frequency=injection_frequency,
+        position=position,
+        benign_frequency=benign_frequency,
+    )
+
+    last_err: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            results = await llm.batch_invoke([prompt])
+            if not results or results[0] is None:
+                raise RuntimeError(f"batch invoke failed [{llm.model_name}]")
+            raw = results[0]
+            cleaned, self_check, region_offsets = _parse_response(raw, injection_frequency)
+            return RewriteResult(
+                rewritten_text=cleaned,
+                style=style,
+                position=position,
+                injection_frequency=injection_frequency,
+                benign_frequency=benign_frequency,
+                self_check=self_check,
+                rewriter_model=model,
+                region_offsets=region_offsets,
+            )
+        except ValueError as e:
+            last_err = e
+            logger.warning(f"arewrite attempt {attempt + 1}/{max_retries + 1} failed: {e}")
+        except Exception as e:
+            last_err = e
+            logger.warning(f"arewrite attempt {attempt + 1}/{max_retries + 1} failed: {e!r}")
+
     return RewriteResult(
         rewritten_text="",
         style=style,

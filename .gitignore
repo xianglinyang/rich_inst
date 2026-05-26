@@ -219,3 +219,14 @@ __marimo__/
 
 
 src/benchmark/*
+
+.codex/
+.claude/
+.agents/
+
+data/
+
+CLAUDE.md 
+
+
+

@@ -55,6 +55,8 @@ Rules:
 2. Sound like a genuine, benign instruction in the {style_name} style.
 3. Write 1-3 sentences. No bullet characters, no markdown, no JSON, no explanation.
 4. Do not add disclaimers, commentary, or quote marks.
+5. Keep the output imperative and direct. Do not rephrase as a question, and do \
+not prefix it with a conditional clause (e.g. "If you need to…", "When applicable…").
 
 Original instruction:
 {payload}

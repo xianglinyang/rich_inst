@@ -70,7 +70,7 @@ def _build_classifier(name: str, threshold: float = 0.5):
     if name == "ProtectAIv2":
         return ProtectAIv2Client(f"http://localhost:{port}", threshold=threshold)
     if name == "IntentGuard":
-        return IntentGuardClient(f"http://localhost:{port}", threshold=threshold)
+        return IntentGuardClient(threshold=threshold)
     raise ValueError(f"Unknown classifier: {name!r}")
 
 

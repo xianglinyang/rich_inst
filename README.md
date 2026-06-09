@@ -60,8 +60,8 @@ Each classifier runs as a local FastAPI service. Start the ones you need:
 ```bash
 uvicorn src.guardrails.detection.PIGuard.app:app          --host 127.0.0.1 --port 12390
 uvicorn src.guardrails.detection.ProtectAIv2.app:app      --host 127.0.0.1 --port 12391
-uvicorn src.guardrails.detection.PromptGuard.app:app      --host 127.0.0.1 --port 12392  # 22M
-uvicorn src.guardrails.detection.PromptGuard.app:app      --host 127.0.0.1 --port 12393  # 86M
+uvicorn src.guardrails.detection.PromptGuard.app:app_22m      --host 127.0.0.1 --port 12392  # 22M
+uvicorn src.guardrails.detection.PromptGuard.app:app_86m      --host 127.0.0.1 --port 12393  # 86M
 uvicorn src.guardrails.detection.IntentGuard.app:app      --host 127.0.0.1 --port 12394
 ```
 
